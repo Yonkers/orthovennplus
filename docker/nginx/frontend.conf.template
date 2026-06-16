@@ -47,6 +47,12 @@ server {
       try_files $uri =404;
     }
 
+    location /downloads/refdb/ {
+      alias /srv/orthovennplus-downloads/refdb/;
+      autoindex off;
+      add_header Cache-Control "public, max-age=31536000, immutable";
+    }
+
     location / {
       root /usr/share/nginx/html;
       try_files $uri/index.html $uri /200.html;

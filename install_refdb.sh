@@ -14,15 +14,18 @@ DOWNLOAD_DIR="${ORTHOVENN_REFDB_DOWNLOAD_DIR:-${REFDB_DIR}/downloads}"
 REFDB_RELEASE_TAG="${ORTHOVENN_REFDB_RELEASE_TAG:-refdb-latest}"
 ARCHIVE_NAME="${ORTHOVENN_REFDB_ARCHIVE_NAME:-orthovennplus-refdb.tar.gz}"
 CHECKSUM_NAME="${ORTHOVENN_REFDB_CHECKSUM_NAME:-${ARCHIVE_NAME}.sha256}"
-SOURCE="${ORTHOVENN_REFDB_SOURCE:-github}"
+SOURCE="${ORTHOVENN_REFDB_SOURCE:-official}"
+FALLBACK_SOURCE="${ORTHOVENN_REFDB_FALLBACK_SOURCE:-github}"
 ARCHIVE_SOURCE=""
 ARCHIVE_URL="${ORTHOVENN_REFDB_URL:-}"
 CHECKSUM_URL="${ORTHOVENN_REFDB_SHA256_URL:-}"
 FORCE=0
 SKIP_CHECKSUM=0
 
+OFFICIAL_BASE_URL="${ORTHOVENN_REFDB_OFFICIAL_BASE_URL:-https://orthovenn.com/downloads/refdb}"
 GITHUB_BASE_URL="https://github.com/Yonkers/orthovennplus/releases/download/${REFDB_RELEASE_TAG}"
 GITEE_BASE_URL="https://gitee.com/leeoluo/orthovennplus-docker/releases/download/${REFDB_RELEASE_TAG}"
+OFFICIAL_BASE_URL="${OFFICIAL_BASE_URL%/}"
 
 REQUIRED_REFDB_FILES=(
   "go-basic.obo"
@@ -39,7 +42,10 @@ Install OrthoVennPlus reference data into data/refdb from a release asset.
 Run this script from the deployment directory.
 
 Options:
-  --source github|gitee  Download source. Default: ${SOURCE}
+  --source official|github|gitee
+                        Download source. Default: ${SOURCE}
+  --fallback-source github|gitee|none
+                        Fallback source used when --source official fails. Default: ${FALLBACK_SOURCE}
   --tag TAG              Release tag containing refdb assets. Default: ${REFDB_RELEASE_TAG}
   --url URL              Direct archive URL. Overrides --source/--tag
   --sha256-url URL       Direct sha256 URL. Default: archive URL + .sha256
@@ -53,9 +59,16 @@ Expected release assets:
   ${ARCHIVE_NAME}
   ${CHECKSUM_NAME}
 
+Optional split archive assets:
+  ${ARCHIVE_NAME}.parts
+  ${ARCHIVE_NAME}.part-aa
+  ${ARCHIVE_NAME}.part-ab
+
 Examples:
   ./install_refdb.sh
+  ./install_refdb.sh --source github
   ./install_refdb.sh --source gitee
+  ./install_refdb.sh --fallback-source none
   ./install_refdb.sh --tag refdb-2026-06-16
   ./install_refdb.sh --url https://example.com/${ARCHIVE_NAME}
   ./install_refdb.sh --archive /path/to/${ARCHIVE_NAME}
@@ -75,6 +88,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --source)
       SOURCE="${2:?Missing value for --source}"
+      shift 2
+      ;;
+    --fallback-source)
+      FALLBACK_SOURCE="${2:?Missing value for --fallback-source}"
       shift 2
       ;;
     --tag)
@@ -120,9 +137,15 @@ done
 
 archive_path="${DOWNLOAD_DIR}/${ARCHIVE_NAME}"
 checksum_path="${DOWNLOAD_DIR}/${CHECKSUM_NAME}"
+ARCHIVE_DOWNLOAD_SOURCE=""
+LAST_DOWNLOAD_SOURCE=""
 
 resolve_base_url() {
-  case "${SOURCE}" in
+  local source="$1"
+  case "${source}" in
+    official)
+      echo "${OFFICIAL_BASE_URL}"
+      ;;
     github)
       echo "${GITHUB_BASE_URL}"
       ;;
@@ -130,9 +153,15 @@ resolve_base_url() {
       echo "${GITEE_BASE_URL}"
       ;;
     *)
-      fail "Unknown source: ${SOURCE}. Use github, gitee, or --url."
+      fail "Unknown source: ${source}. Use official, github, gitee, or --url."
       ;;
   esac
+}
+
+resolve_asset_url_for_source() {
+  local source="$1"
+  local asset_name="$2"
+  echo "$(resolve_base_url "${source}")/${asset_name}"
 }
 
 resolve_archive_url() {
@@ -140,7 +169,7 @@ resolve_archive_url() {
     echo "${ARCHIVE_URL}"
     return
   fi
-  echo "$(resolve_base_url)/${ARCHIVE_NAME}"
+  echo "$(resolve_asset_url_for_source "${SOURCE}" "${ARCHIVE_NAME}")"
 }
 
 resolve_checksum_url() {
@@ -149,6 +178,101 @@ resolve_checksum_url() {
     return
   fi
   echo "$(resolve_archive_url).sha256"
+}
+
+download_release_asset() {
+  local output="$1"
+  local asset_name="$2"
+  local preferred_source="${3:-}"
+  local candidates=()
+  local source
+
+  add_candidate() {
+    local candidate="$1"
+    local existing
+    [[ -n "${candidate}" && "${candidate}" != "none" ]] || return 0
+    if [[ "${#candidates[@]}" -gt 0 ]]; then
+      for existing in "${candidates[@]}"; do
+        [[ "${existing}" == "${candidate}" ]] && return 0
+      done
+    fi
+    candidates+=("${candidate}")
+  }
+
+  add_candidate "${preferred_source}"
+  if [[ "${SOURCE}" == "official" ]]; then
+    add_candidate "official"
+    add_candidate "${FALLBACK_SOURCE}"
+  else
+    add_candidate "${SOURCE}"
+  fi
+
+  for source in "${candidates[@]}"; do
+    if [[ "${asset_name}" == "${ARCHIVE_NAME}" ]]; then
+      if download_archive_asset_from_source "${source}" "${output}"; then
+        LAST_DOWNLOAD_SOURCE="${source}"
+        return 0
+      fi
+    elif download_file "$(resolve_asset_url_for_source "${source}" "${asset_name}")" "${output}"; then
+      LAST_DOWNLOAD_SOURCE="${source}"
+      return 0
+    fi
+    echo "Download failed from source '${source}', trying next source if available." >&2
+    rm -f "${output}"
+  done
+
+  fail "Failed to download ${asset_name} from configured sources."
+}
+
+download_archive_asset_from_source() {
+  local source="$1"
+  local output="$2"
+
+  if download_file "$(resolve_asset_url_for_source "${source}" "${ARCHIVE_NAME}")" "${output}"; then
+    return 0
+  fi
+
+  echo "Single archive was not available from source '${source}', trying split archive parts." >&2
+  rm -f "${output}"
+  download_split_archive_from_source "${source}" "${output}"
+}
+
+download_split_archive_from_source() {
+  local source="$1"
+  local output="$2"
+  local manifest_path="${DOWNLOAD_DIR}/${ARCHIVE_NAME}.parts"
+  local tmp_output="${output}.tmp"
+  local part_name
+  local part_path
+  local part_count=0
+
+  rm -f "${manifest_path}" "${tmp_output}"
+  if ! download_file "$(resolve_asset_url_for_source "${source}" "${ARCHIVE_NAME}.parts")" "${manifest_path}"; then
+    rm -f "${manifest_path}" "${tmp_output}"
+    return 1
+  fi
+
+  while IFS= read -r part_name || [[ -n "${part_name}" ]]; do
+    part_name="${part_name%$'\r'}"
+    [[ -n "${part_name}" ]] || continue
+    [[ "${part_name}" != \#* ]] || continue
+    case "${part_name}" in
+      */*|*..*)
+        fail "Invalid split archive part name in manifest: ${part_name}"
+        ;;
+    esac
+
+    part_path="${DOWNLOAD_DIR}/${part_name}"
+    if ! download_file "$(resolve_asset_url_for_source "${source}" "${part_name}")" "${part_path}"; then
+      rm -f "${tmp_output}"
+      return 1
+    fi
+    cat "${part_path}" >> "${tmp_output}"
+    part_count=$((part_count + 1))
+  done < "${manifest_path}"
+
+  [[ "${part_count}" -gt 0 ]] || fail "Split archive manifest has no parts: ${manifest_path}"
+  mv "${tmp_output}" "${output}"
 }
 
 has_refdb() {
@@ -180,7 +304,15 @@ download_file() {
   command -v curl >/dev/null 2>&1 || fail "curl command not found"
   mkdir -p "$(dirname "${output}")"
   echo "Downloading ${url}"
-  curl -fL --retry 3 --retry-delay 2 -C - -o "${output}" "${url}"
+  curl -fL \
+    --retry 3 \
+    --retry-delay 2 \
+    --connect-timeout 15 \
+    --speed-time 60 \
+    --speed-limit 1024 \
+    -C - \
+    -o "${output}" \
+    "${url}"
 }
 
 prepare_archive() {
@@ -194,7 +326,12 @@ prepare_archive() {
     echo "Archive already present: ${archive_path}"
     return
   fi
-  download_file "$(resolve_archive_url)" "${archive_path}"
+  if [[ -n "${ARCHIVE_URL}" ]]; then
+    download_file "$(resolve_archive_url)" "${archive_path}"
+  else
+    download_release_asset "${archive_path}" "${ARCHIVE_NAME}"
+    ARCHIVE_DOWNLOAD_SOURCE="${LAST_DOWNLOAD_SOURCE}"
+  fi
 }
 
 prepare_checksum() {
@@ -215,7 +352,11 @@ prepare_checksum() {
     echo "Checksum already present: ${checksum_path}"
     return
   fi
-  download_file "$(resolve_checksum_url)" "${checksum_path}"
+  if [[ -n "${CHECKSUM_URL}" || -n "${ARCHIVE_URL}" ]]; then
+    download_file "$(resolve_checksum_url)" "${checksum_path}"
+  else
+    download_release_asset "${checksum_path}" "${CHECKSUM_NAME}" "${ARCHIVE_DOWNLOAD_SOURCE}"
+  fi
 }
 
 verify_checksum() {

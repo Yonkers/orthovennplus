@@ -110,31 +110,18 @@ PROJECT_SPECIES_LIMIT=20
 
 ### 3. Install Reference Data
 
-Install the required reference data from the release asset:
+Install the required reference data. By default, the installer downloads from the official OrthoVennPlus web source and falls back to the GitHub release if the official source is unavailable:
+
+To force GitHub release downloads:
 
 ```bash
-./install_refdb.sh
+./install_refdb.sh --source github
 ```
 
-For mainland China, use the Gitee release source if the refdb asset has been published there:
+Use the Gitee release source only if the refdb asset has also been published there. The Gitee source may use either the full archive or split archive parts:
 
 ```bash
 ./install_refdb.sh --source gitee
-```
-
-If you downloaded the archive manually, install it from a local file:
-
-```bash
-./install_refdb.sh --archive /path/to/orthovennplus-refdb.tar.gz
-```
-
-The installer verifies `orthovennplus-refdb.tar.gz.sha256` by default for release downloads. For a local archive, it uses `/path/to/orthovennplus-refdb.tar.gz.sha256` if that file exists; otherwise it skips checksum verification and installs from the local archive. After extraction, it checks these required files:
-
-```text
-data/refdb/go-basic.obo
-data/refdb/go_terms.tsv
-data/refdb/uniprot_sprot_annotation.dmnd
-data/refdb/uniprot_sprot_annotation.tsv
 ```
 
 If the release asset is unavailable and you need to generate the UniProt reference files manually, run:
@@ -171,12 +158,6 @@ Use a specific image tag when deploying a released version:
 
 ```bash
 ./run.sh --tag latest
-```
-
-You can combine the tag and registry options:
-
-```bash
-./run.sh --registry aliyun --tag latest
 ```
 
 Check the available options:
