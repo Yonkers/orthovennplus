@@ -2,7 +2,8 @@
 set -Eeuo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REGISTRY="${ORTHOVENN_REGISTRY:-crpi-d7tubu0e345ls62u.cn-chengdu.personal.cr.aliyuncs.com}"
+ALIYUN_REGISTRY="crpi-d7tubu0e345ls62u.cn-chengdu.personal.cr.aliyuncs.com"
+REGISTRY="${ORTHOVENN_REGISTRY:-dockerhub}"
 NAMESPACE="${ORTHOVENN_IMAGE_NAMESPACE:-leeoluo}"
 TAG="${ORTHOVENN_IMAGE_TAG:-latest}"
 SKIP_PULL=0
@@ -14,7 +15,7 @@ Usage: ./run.sh [options] [docker compose up args...]
 
 Options:
   --tag TAG           Image tag to pull and run. Default: ${TAG}
-  --registry HOST     Remote registry. Default: ${REGISTRY}
+  --registry VALUE    Image registry: dockerhub, aliyun, or registry host. Default: ${REGISTRY}
   --namespace NAME    Image namespace. Default: ${NAMESPACE}
   --skip-pull         Skip image pull/tag and only run docker compose up
   --skip-migrate      Skip database migration before starting services
@@ -22,9 +23,62 @@ Options:
 
 Examples:
   ./run.sh
-  ./run.sh --tag 2026-06-02
+  ./run.sh --tag latest
+  ./run.sh --registry dockerhub
+  ./run.sh --registry aliyun
+  ./run.sh --registry ${ALIYUN_REGISTRY}
   ./run.sh --skip-pull backend celery_worker interactive_worker selection_worker
+
+When using aliyun/custom registry, publish base images as:
+  ${NAMESPACE}/postgres:15-alpine      -> postgres:15-alpine
+  ${NAMESPACE}/tusd:v2                -> tusproject/tusd:v2
+  ${NAMESPACE}/nginx:1.27-alpine      -> nginx:1.27-alpine
 EOF
+}
+
+resolve_registry_host() {
+  case "${1}" in
+    dockerhub|"")
+      echo ""
+      ;;
+    aliyun)
+      echo "${ALIYUN_REGISTRY}"
+      ;;
+    *)
+      echo "${1}"
+      ;;
+  esac
+}
+
+app_image_ref() {
+  local registry_host="$1"
+  local image="$2"
+  if [[ -n "${registry_host}" ]]; then
+    echo "${registry_host}/${NAMESPACE}/${image}:${TAG}"
+  else
+    echo "${NAMESPACE}/${image}:${TAG}"
+  fi
+}
+
+base_image_ref() {
+  local registry_host="$1"
+  local remote_repo="$2"
+  local image_tag="$3"
+  local local_ref="$4"
+  if [[ -n "${registry_host}" ]]; then
+    echo "${registry_host}/${NAMESPACE}/${remote_repo}:${image_tag}"
+  else
+    echo "${local_ref}"
+  fi
+}
+
+pull_and_tag_image() {
+  local remote_ref="$1"
+  local local_ref="$2"
+  docker pull "${remote_ref}"
+  if [[ "${remote_ref}" != "${local_ref}" ]]; then
+    docker tag "${remote_ref}" "${local_ref}"
+  fi
 }
 
 while [[ $# -gt 0 ]]; do
@@ -63,11 +117,17 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-images=(
+app_images=(
   "orthovennplus-backend"
   "orthovennplus-backend-flower"
   "orthovennplus-worker-biobase"
   "orthovennplus-frontend"
+)
+
+base_images=(
+  "postgres|15-alpine|postgres:15-alpine"
+  "tusd|v2|tusproject/tusd:v2"
+  "nginx|1.27-alpine|nginx:1.27-alpine"
 )
 
 cd "${ROOT_DIR}"
@@ -91,14 +151,25 @@ for dir in "${data_dirs[@]}"; do
 done
 
 if [[ "${SKIP_PULL}" -eq 0 ]]; then
-  echo "Pulling images from ${REGISTRY}/${NAMESPACE} with tag ${TAG}..."
-  for image in "${images[@]}"; do
-    docker pull "${REGISTRY}/${NAMESPACE}/${image}:${TAG}"
+  REGISTRY_HOST="$(resolve_registry_host "${REGISTRY}")"
+  if [[ -n "${REGISTRY_HOST}" ]]; then
+    echo "Pulling images from ${REGISTRY_HOST}/${NAMESPACE}..."
+  else
+    echo "Pulling images from Docker Hub..."
+  fi
+
+  echo "Pulling application images with tag ${TAG}..."
+  for image in "${app_images[@]}"; do
+    remote_ref="$(app_image_ref "${REGISTRY_HOST}" "${image}")"
+    local_ref="${NAMESPACE}/${image}:${TAG}"
+    pull_and_tag_image "${remote_ref}" "${local_ref}"
   done
 
-  echo "Tagging images locally..."
-  for image in "${images[@]}"; do
-    docker tag "${REGISTRY}/${NAMESPACE}/${image}:${TAG}" "${NAMESPACE}/${image}:${TAG}"
+  echo "Pulling base images..."
+  for item in "${base_images[@]}"; do
+    IFS="|" read -r remote_repo image_tag local_ref <<< "${item}"
+    remote_ref="$(base_image_ref "${REGISTRY_HOST}" "${remote_repo}" "${image_tag}" "${local_ref}")"
+    pull_and_tag_image "${remote_ref}" "${local_ref}"
   done
 fi
 
