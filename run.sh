@@ -109,6 +109,25 @@ frontend_url() {
   echo "http://localhost:$(frontend_port)"
 }
 
+COMPOSE_CMD=()
+
+detect_compose_command() {
+  if docker compose version >/dev/null 2>&1; then
+    COMPOSE_CMD=(docker compose)
+    return
+  fi
+  if command -v docker-compose >/dev/null 2>&1; then
+    COMPOSE_CMD=(docker-compose)
+    return
+  fi
+  echo "Docker Compose is required. Install Docker Compose v2 plugin or docker-compose." >&2
+  exit 1
+}
+
+docker_compose() {
+  ORTHOVENN_IMAGE_TAG="${TAG}" "${COMPOSE_CMD[@]}" "$@"
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --tag)
@@ -147,7 +166,6 @@ done
 
 app_images=(
   "orthovennplus-backend"
-  "orthovennplus-backend-flower"
   "orthovennplus-worker-biobase"
   "orthovennplus-frontend"
 )
@@ -160,6 +178,8 @@ base_images=(
 )
 
 cd "${ROOT_DIR}"
+detect_compose_command
+echo "Using Docker Compose command: ${COMPOSE_CMD[*]}"
 
 data_dirs=(
   "data/projects"
@@ -204,14 +224,14 @@ fi
 
 if [[ "${SKIP_MIGRATE}" -eq 0 ]]; then
   echo "Starting database dependencies..."
-  ORTHOVENN_IMAGE_TAG="${TAG}" docker compose up -d postgres redis
+  docker_compose up -d postgres redis
 
   echo "Running database migrations..."
-  ORTHOVENN_IMAGE_TAG="${TAG}" docker compose run --rm backend alembic upgrade head
+  docker_compose run --rm backend alembic upgrade head
 fi
 
 echo "Starting Docker Compose services..."
-ORTHOVENN_IMAGE_TAG="${TAG}" docker compose up -d "$@"
+docker_compose up -d "$@"
 
 FRONTEND_PORT="$(frontend_port)"
 echo ""
