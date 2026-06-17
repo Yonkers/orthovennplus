@@ -34,6 +34,12 @@ When using aliyun/custom registry, publish base images as:
   ${NAMESPACE}/redis:8.6.2             -> redis:8.6.2
   ${NAMESPACE}/tusd:v2                -> tusproject/tusd:v2
   ${NAMESPACE}/nginx:1.27-alpine      -> nginx:1.27-alpine
+
+Permission environment variables:
+  ORTHOVENN_DATA_OWNER    Host owner for writable data dirs. Default: sudo user
+  ORTHOVENN_DATA_GROUP    Host group for writable data dirs. Default: owner's primary group
+  ORTHOVENN_DATA_DIR_MODE Writable data dir mode. Default: 775
+  ORTHOVENN_TUS_DIR_MODE  TUS upload dir mode. Default: 777
 EOF
 }
 
@@ -213,6 +219,28 @@ for dir in "${data_dirs[@]}"; do
   fi
   mkdir -p "${dir}"
 done
+
+DATA_OWNER="${ORTHOVENN_DATA_OWNER:-}"
+if [[ -z "${DATA_OWNER}" && "${EUID}" -eq 0 && -n "${SUDO_USER:-}" && "${SUDO_USER}" != "root" ]]; then
+  DATA_OWNER="${SUDO_USER}"
+fi
+DATA_GROUP="${ORTHOVENN_DATA_GROUP:-}"
+if [[ -n "${DATA_OWNER}" && -z "${DATA_GROUP}" ]]; then
+  DATA_GROUP="$(id -gn "${DATA_OWNER}" 2>/dev/null || echo "${DATA_OWNER}")"
+fi
+DATA_DIR_MODE="${ORTHOVENN_DATA_DIR_MODE:-775}"
+TUS_DIR_MODE="${ORTHOVENN_TUS_DIR_MODE:-777}"
+
+if [[ -n "${DATA_OWNER}" ]]; then
+  for dir in data/projects data/uploads data/uploads/tus data/tmp data/logs data/builtin_db; do
+    chown "${DATA_OWNER}:${DATA_GROUP}" "${dir}" 2>/dev/null || true
+  done
+fi
+
+for dir in data/projects data/uploads data/tmp data/logs data/builtin_db; do
+  chmod "${DATA_DIR_MODE}" "${dir}" 2>/dev/null || true
+done
+chmod "${TUS_DIR_MODE}" data/uploads/tus 2>/dev/null || true
 
 if [[ "${SKIP_PULL}" -eq 0 ]]; then
   REGISTRY_HOST="$(resolve_registry_host "${REGISTRY}")"
