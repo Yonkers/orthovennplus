@@ -109,6 +109,21 @@ frontend_url() {
   echo "http://localhost:$(frontend_port)"
 }
 
+server_ip() {
+  local ip=""
+  ip="$(hostname -I 2>/dev/null | awk '{print $1}' || true)"
+  if [[ -z "${ip}" ]]; then
+    ip="$(ip route get 1.1.1.1 2>/dev/null | awk '{for (i = 1; i <= NF; i++) if ($i == "src") { print $(i + 1); exit }}' || true)"
+  fi
+  if [[ -z "${ip}" ]]; then
+    ip="$(ipconfig getifaddr en0 2>/dev/null || true)"
+  fi
+  if [[ -z "${ip}" ]]; then
+    ip="$(ifconfig 2>/dev/null | awk '/inet / && $2 != "127.0.0.1" { print $2; exit }' || true)"
+  fi
+  echo "${ip:-}"
+}
+
 COMPOSE_CMD=()
 
 detect_compose_command() {
@@ -234,7 +249,13 @@ echo "Starting Docker Compose services..."
 docker_compose up -d "$@"
 
 FRONTEND_PORT="$(frontend_port)"
+SERVER_IP="$(server_ip)"
 echo ""
-echo "Frontend URL: $(frontend_url)"
-echo "Remote server: http://<server-ip>:${FRONTEND_PORT}"
+echo "Web URL:"
+echo "  $(frontend_url)"
+if [[ -n "${SERVER_IP}" ]]; then
+  echo "  http://${SERVER_IP}:${FRONTEND_PORT}"
+else
+  echo "  http://<server-ip>:${FRONTEND_PORT}"
+fi
 echo "Done."
