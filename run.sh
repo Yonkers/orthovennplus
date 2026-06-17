@@ -81,6 +81,33 @@ pull_and_tag_image() {
   fi
 }
 
+read_dotenv_value() {
+  local key="$1"
+  local line
+  [[ -f "${ROOT_DIR}/.env" ]] || return 0
+  line="$(grep -E "^${key}=" "${ROOT_DIR}/.env" | tail -n 1 || true)"
+  [[ -n "${line}" ]] || return 0
+  line="${line#*=}"
+  line="${line%\"}"
+  line="${line#\"}"
+  line="${line%\'}"
+  line="${line#\'}"
+  echo "${line}"
+}
+
+frontend_port() {
+  local port="${WEB_PORT:-}"
+  if [[ -z "${port}" ]]; then
+    port="$(read_dotenv_value WEB_PORT)"
+  fi
+  port="${port:-5920}"
+  echo "${port}"
+}
+
+frontend_url() {
+  echo "http://localhost:$(frontend_port)"
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --tag)
@@ -184,4 +211,8 @@ fi
 echo "Starting Docker Compose services..."
 ORTHOVENN_IMAGE_TAG="${TAG}" docker compose up -d "$@"
 
+FRONTEND_PORT="$(frontend_port)"
+echo ""
+echo "Frontend URL: $(frontend_url)"
+echo "Remote server: http://<server-ip>:${FRONTEND_PORT}"
 echo "Done."

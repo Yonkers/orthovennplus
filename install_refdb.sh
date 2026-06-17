@@ -15,7 +15,7 @@ REFDB_RELEASE_TAG="${ORTHOVENN_REFDB_RELEASE_TAG:-refdb-latest}"
 ARCHIVE_NAME="${ORTHOVENN_REFDB_ARCHIVE_NAME:-orthovennplus-refdb.tar.gz}"
 CHECKSUM_NAME="${ORTHOVENN_REFDB_CHECKSUM_NAME:-${ARCHIVE_NAME}.sha256}"
 SOURCE="${ORTHOVENN_REFDB_SOURCE:-official}"
-FALLBACK_SOURCE="${ORTHOVENN_REFDB_FALLBACK_SOURCE:-github}"
+FALLBACK_SOURCE="${ORTHOVENN_REFDB_FALLBACK_SOURCE:-github,gitee}"
 ARCHIVE_SOURCE=""
 ARCHIVE_URL="${ORTHOVENN_REFDB_URL:-}"
 CHECKSUM_URL="${ORTHOVENN_REFDB_SHA256_URL:-}"
@@ -44,8 +44,8 @@ Run this script from the deployment directory.
 Options:
   --source official|github|gitee
                         Download source. Default: ${SOURCE}
-  --fallback-source github|gitee|none
-                        Fallback source used when --source official fails. Default: ${FALLBACK_SOURCE}
+  --fallback-source github,gitee|github|gitee|none
+                        Comma-separated fallback sources used when --source official fails. Default: ${FALLBACK_SOURCE}
   --tag TAG              Release tag containing refdb assets. Default: ${REFDB_RELEASE_TAG}
   --url URL              Direct archive URL. Overrides --source/--tag
   --sha256-url URL       Direct sha256 URL. Default: archive URL + .sha256
@@ -78,6 +78,31 @@ EOF
 fail() {
   echo "ERROR: $*" >&2
   exit 1
+}
+
+log() {
+  echo "[INFO] $*"
+}
+
+warn() {
+  echo "[WARN] $*" >&2
+}
+
+source_label() {
+  case "$1" in
+    official)
+      echo "official OrthoVennPlus server"
+      ;;
+    github)
+      echo "GitHub release"
+      ;;
+    gitee)
+      echo "Gitee release"
+      ;;
+    *)
+      echo "$1"
+      ;;
+  esac
 }
 
 while [[ $# -gt 0 ]]; do
@@ -190,6 +215,7 @@ download_release_asset() {
   add_candidate() {
     local candidate="$1"
     local existing
+    candidate="${candidate//[[:space:]]/}"
     [[ -n "${candidate}" && "${candidate}" != "none" ]] || return 0
     if [[ "${#candidates[@]}" -gt 0 ]]; then
       for existing in "${candidates[@]}"; do
@@ -199,25 +225,38 @@ download_release_asset() {
     candidates+=("${candidate}")
   }
 
+  add_fallback_candidates() {
+    local fallback_sources="$1"
+    local fallback
+    local -a fallback_list=()
+    IFS=',' read -ra fallback_list <<< "${fallback_sources}"
+    for fallback in "${fallback_list[@]}"; do
+      add_candidate "${fallback}"
+    done
+  }
+
   add_candidate "${preferred_source}"
   if [[ "${SOURCE}" == "official" ]]; then
     add_candidate "official"
-    add_candidate "${FALLBACK_SOURCE}"
+    add_fallback_candidates "${FALLBACK_SOURCE}"
   else
     add_candidate "${SOURCE}"
   fi
 
   for source in "${candidates[@]}"; do
+    log "Trying $(source_label "${source}") for ${asset_name}..."
     if [[ "${asset_name}" == "${ARCHIVE_NAME}" ]]; then
       if download_archive_asset_from_source "${source}" "${output}"; then
         LAST_DOWNLOAD_SOURCE="${source}"
+        log "Downloaded ${asset_name} from $(source_label "${source}")."
         return 0
       fi
     elif download_file "$(resolve_asset_url_for_source "${source}" "${asset_name}")" "${output}"; then
       LAST_DOWNLOAD_SOURCE="${source}"
+      log "Downloaded ${asset_name} from $(source_label "${source}")."
       return 0
     fi
-    echo "Download failed from source '${source}', trying next source if available." >&2
+    warn "Download failed from $(source_label "${source}"); trying next source if available."
     rm -f "${output}"
   done
 
@@ -232,7 +271,7 @@ download_archive_asset_from_source() {
     return 0
   fi
 
-  echo "Single archive was not available from source '${source}', trying split archive parts." >&2
+  warn "Full archive was not available from $(source_label "${source}"); trying split archive parts."
   rm -f "${output}"
   download_split_archive_from_source "${source}" "${output}"
 }
@@ -247,6 +286,7 @@ download_split_archive_from_source() {
   local part_count=0
 
   rm -f "${manifest_path}" "${tmp_output}"
+  log "Downloading split archive manifest from $(source_label "${source}")."
   if ! download_file "$(resolve_asset_url_for_source "${source}" "${ARCHIVE_NAME}.parts")" "${manifest_path}"; then
     rm -f "${manifest_path}" "${tmp_output}"
     return 1
@@ -263,6 +303,7 @@ download_split_archive_from_source() {
     esac
 
     part_path="${DOWNLOAD_DIR}/${part_name}"
+    log "Downloading split archive part ${part_name}."
     if ! download_file "$(resolve_asset_url_for_source "${source}" "${part_name}")" "${part_path}"; then
       rm -f "${tmp_output}"
       return 1
@@ -273,6 +314,7 @@ download_split_archive_from_source() {
 
   [[ "${part_count}" -gt 0 ]] || fail "Split archive manifest has no parts: ${manifest_path}"
   mv "${tmp_output}" "${output}"
+  log "Merged ${part_count} split archive part(s)."
 }
 
 has_refdb() {
@@ -303,7 +345,7 @@ download_file() {
   local output="$2"
   command -v curl >/dev/null 2>&1 || fail "curl command not found"
   mkdir -p "$(dirname "${output}")"
-  echo "Downloading ${url}"
+  log "Downloading ${url}"
   curl -fL \
     --retry 3 \
     --retry-delay 2 \
@@ -320,13 +362,15 @@ prepare_archive() {
   if [[ -n "${ARCHIVE_SOURCE}" ]]; then
     [[ -f "${ARCHIVE_SOURCE}" ]] || fail "Archive not found: ${ARCHIVE_SOURCE}"
     archive_path="${ARCHIVE_SOURCE}"
+    log "Using local archive: ${archive_path}"
     return
   fi
   if [[ -f "${archive_path}" && "${FORCE}" -eq 0 ]]; then
-    echo "Archive already present: ${archive_path}"
+    log "Archive already present: ${archive_path}"
     return
   fi
   if [[ -n "${ARCHIVE_URL}" ]]; then
+    log "Using direct archive URL."
     download_file "$(resolve_archive_url)" "${archive_path}"
   else
     download_release_asset "${archive_path}" "${ARCHIVE_NAME}"
@@ -340,19 +384,20 @@ prepare_checksum() {
     local local_checksum="${ARCHIVE_SOURCE}.sha256"
     if [[ -f "${local_checksum}" ]]; then
       checksum_path="${local_checksum}"
-      echo "Using local checksum: ${checksum_path}"
+      log "Using local checksum: ${checksum_path}"
     else
-      echo "Local checksum not found: ${local_checksum}"
-      echo "Skipping checksum verification for local archive."
+      warn "Local checksum not found: ${local_checksum}"
+      warn "Skipping checksum verification for local archive."
       SKIP_CHECKSUM=1
     fi
     return
   fi
   if [[ -f "${checksum_path}" && "${FORCE}" -eq 0 ]]; then
-    echo "Checksum already present: ${checksum_path}"
+    log "Checksum already present: ${checksum_path}"
     return
   fi
   if [[ -n "${CHECKSUM_URL}" || -n "${ARCHIVE_URL}" ]]; then
+    log "Using direct checksum URL."
     download_file "$(resolve_checksum_url)" "${checksum_path}"
   else
     download_release_asset "${checksum_path}" "${CHECKSUM_NAME}" "${ARCHIVE_DOWNLOAD_SOURCE}"
@@ -370,7 +415,7 @@ verify_checksum() {
   if [[ "${expected}" != "${actual}" ]]; then
     fail "Checksum mismatch for ${archive_path}"
   fi
-  echo "Checksum verified: ${archive_path}"
+  log "Checksum verified: ${archive_path}"
 }
 
 extract_archive() {
@@ -379,7 +424,7 @@ extract_archive() {
   tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/orthovenn-refdb.XXXXXX")"
   trap "rm -rf '${tmp_dir}'" EXIT
 
-  echo "Extracting ${archive_path}"
+  log "Extracting ${archive_path}"
   tar -xzf "${archive_path}" -C "${tmp_dir}"
 
   if [[ -d "${tmp_dir}/data/refdb" ]]; then
@@ -392,19 +437,31 @@ extract_archive() {
 
   mkdir -p "${REFDB_DIR}"
   cp -R "${source_dir}/." "${REFDB_DIR}/"
+  log "Reference data extracted to ${REFDB_DIR}."
 }
 
 install_refdb() {
   if has_refdb && [[ "${FORCE}" -eq 0 ]]; then
-    echo "Reference DB already complete. Use --force to reinstall."
+    log "Reference DB already complete. Use --force to reinstall."
     status_refdb
     return
+  fi
+  log "Installing OrthoVennPlus reference data."
+  log "Destination: ${REFDB_DIR}"
+  log "Download cache: ${DOWNLOAD_DIR}"
+  if [[ -z "${ARCHIVE_SOURCE}" && -z "${ARCHIVE_URL}" ]]; then
+    if [[ "${SOURCE}" == "official" ]]; then
+      log "Download sources: official -> ${FALLBACK_SOURCE}"
+    else
+      log "Download source: ${SOURCE}"
+    fi
   fi
   prepare_archive
   prepare_checksum
   verify_checksum
   extract_archive
   has_refdb || fail "Reference DB is still incomplete after extraction."
+  log "Reference DB installation completed."
   status_refdb
 }
 
