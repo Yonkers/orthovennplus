@@ -31,6 +31,7 @@ Examples:
 
 When using aliyun/custom registry, publish base images as:
   ${NAMESPACE}/postgres:15-alpine      -> postgres:15-alpine
+  ${NAMESPACE}/redis:8.6.2             -> redis:8.6.2
   ${NAMESPACE}/tusd:v2                -> tusproject/tusd:v2
   ${NAMESPACE}/nginx:1.27-alpine      -> nginx:1.27-alpine
 EOF
@@ -153,6 +154,7 @@ app_images=(
 
 base_images=(
   "postgres|15-alpine|postgres:15-alpine"
+  "redis|8.6.2|redis:8.6.2"
   "tusd|v2|tusproject/tusd:v2"
   "nginx|1.27-alpine|nginx:1.27-alpine"
 )
