@@ -43,6 +43,8 @@ Mainland China source:
 curl -fsSL https://gitee.com/leeoluo/orthovennplus-docker/raw/main/tools/install_bootstrap.sh | bash -s -- --region cn
 ```
 
+If `--region` is omitted, the installer tests GitHub and Gitee connectivity and chooses a default region automatically.
+
 After installation, open:
 
 ```text
@@ -114,7 +116,7 @@ If `.env` is missing, create it from the example file: `cp .env.example .env`
 
 #### 3. Install Reference Data
 
-Install the required reference data. By default, the installer downloads from the official OrthoVennPlus web source and falls back to GitHub or Gitee if the official source is unavailable:
+Install the required reference data. The installer chooses the default download source by region: global installations use GitHub first, mainland China installations use Gitee first, and both fall back to the official OrthoVennPlus web source if needed:
 
 ```bash
 ./install_refdb.sh

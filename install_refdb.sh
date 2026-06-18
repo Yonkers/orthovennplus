@@ -14,8 +14,14 @@ DOWNLOAD_DIR="${ORTHOVENN_REFDB_DOWNLOAD_DIR:-${REFDB_DIR}/downloads}"
 REFDB_RELEASE_TAG="${ORTHOVENN_REFDB_RELEASE_TAG:-refdb-latest}"
 ARCHIVE_NAME="${ORTHOVENN_REFDB_ARCHIVE_NAME:-orthovennplus-refdb.tar.gz}"
 CHECKSUM_NAME="${ORTHOVENN_REFDB_CHECKSUM_NAME:-${ARCHIVE_NAME}.sha256}"
-SOURCE="${ORTHOVENN_REFDB_SOURCE:-official}"
-FALLBACK_SOURCE="${ORTHOVENN_REFDB_FALLBACK_SOURCE:-github,gitee}"
+INSTALL_REGION="${ORTHOVENN_INSTALL_REGION:-cn}"
+if [[ "${INSTALL_REGION}" == "global" ]]; then
+  DEFAULT_SOURCE="github"
+else
+  DEFAULT_SOURCE="gitee"
+fi
+SOURCE="${ORTHOVENN_REFDB_SOURCE:-${DEFAULT_SOURCE}}"
+FALLBACK_SOURCE="${ORTHOVENN_REFDB_FALLBACK_SOURCE:-official}"
 ARCHIVE_SOURCE=""
 ARCHIVE_URL="${ORTHOVENN_REFDB_URL:-}"
 CHECKSUM_URL="${ORTHOVENN_REFDB_SHA256_URL:-}"
@@ -45,7 +51,7 @@ Options:
   --source official|github|gitee
                         Download source. Default: ${SOURCE}
   --fallback-source github,gitee|github|gitee|none
-                        Comma-separated fallback sources used when --source official fails. Default: ${FALLBACK_SOURCE}
+                        Comma-separated fallback sources used when the primary source fails. Default: ${FALLBACK_SOURCE}
   --tag TAG              Release tag containing refdb assets. Default: ${REFDB_RELEASE_TAG}
   --url URL              Direct archive URL. Overrides --source/--tag
   --sha256-url URL       Direct sha256 URL. Default: archive URL + .sha256
@@ -236,12 +242,8 @@ download_release_asset() {
   }
 
   add_candidate "${preferred_source}"
-  if [[ "${SOURCE}" == "official" ]]; then
-    add_candidate "official"
-    add_fallback_candidates "${FALLBACK_SOURCE}"
-  else
-    add_candidate "${SOURCE}"
-  fi
+  add_candidate "${SOURCE}"
+  add_fallback_candidates "${FALLBACK_SOURCE}"
 
   for source in "${candidates[@]}"; do
     log "Trying $(source_label "${source}") for ${asset_name}..."
@@ -450,8 +452,8 @@ install_refdb() {
   log "Destination: ${REFDB_DIR}"
   log "Download cache: ${DOWNLOAD_DIR}"
   if [[ -z "${ARCHIVE_SOURCE}" && -z "${ARCHIVE_URL}" ]]; then
-    if [[ "${SOURCE}" == "official" ]]; then
-      log "Download sources: official -> ${FALLBACK_SOURCE}"
+    if [[ -n "${FALLBACK_SOURCE}" && "${FALLBACK_SOURCE}" != "none" ]]; then
+      log "Download sources: ${SOURCE} -> ${FALLBACK_SOURCE}"
     else
       log "Download source: ${SOURCE}"
     fi

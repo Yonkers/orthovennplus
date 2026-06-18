@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-REGION="${ORTHOVENN_INSTALL_REGION:-global}"
+REGION="${ORTHOVENN_INSTALL_REGION:-auto}"
 DEFAULT_INSTALL_DIR="${HOME:-$(pwd)}/orthovennplus"
 INSTALL_DIR="${ORTHOVENN_INSTALL_DIR:-${DEFAULT_INSTALL_DIR}}"
 TAG="${ORTHOVENN_IMAGE_TAG:-latest}"
@@ -18,6 +18,8 @@ CN_REPO_URL="${ORTHOVENN_DEPLOY_CN_REPO:-https://gitee.com/leeoluo/orthovennplus
 GLOBAL_RELEASE_ARCHIVE_URL="${ORTHOVENN_DEPLOY_GLOBAL_RELEASE_ARCHIVE_URL:-https://github.com/Yonkers/orthovennplus/archive/refs/heads/main.zip}"
 CN_RELEASE_ARCHIVE_URL="${ORTHOVENN_DEPLOY_CN_RELEASE_ARCHIVE_URL:-https://gitee.com/leeoluo/orthovennplus-docker/releases/download/latest/orthovennplus-docker.zip}"
 CN_SOURCE_ARCHIVE_URL="${ORTHOVENN_DEPLOY_CN_SOURCE_ARCHIVE_URL:-https://gitee.com/leeoluo/orthovennplus-docker/repository/archive/main.zip}"
+GLOBAL_PROBE_URL="${ORTHOVENN_GLOBAL_PROBE_URL:-https://raw.githubusercontent.com/Yonkers/orthovennplus/main/.env.example}"
+CN_PROBE_URL="${ORTHOVENN_CN_PROBE_URL:-https://gitee.com/leeoluo/orthovennplus-docker/raw/main/.env.example}"
 
 usage() {
   cat <<EOF
@@ -26,7 +28,8 @@ Usage: install_bootstrap.sh [options]
 Download the OrthoVennPlus deployment package and hand off to tools/install.sh.
 
 Options:
-  --region cn|global  Installation region preset. Default: ${REGION}
+  --region cn|global|auto
+                       Installation region preset. Default: ${REGION}
   --dir DIR           Installation directory. Default: ${INSTALL_DIR}
   --tag TAG           Docker image tag. Default: ${TAG}
   --registry VALUE    Override Docker registry preset
@@ -49,6 +52,13 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --region)
       REGION="${2:?Missing value for --region}"
+      case "${REGION}" in
+        cn|global|auto) ;;
+        *)
+          echo "Invalid --region: ${REGION}. Use cn, global, or auto." >&2
+          exit 2
+          ;;
+      esac
       shift 2
       ;;
     --dir)
@@ -151,6 +161,51 @@ repo_url_for_region() {
   fi
 }
 
+probe_url() {
+  local url="$1"
+  local output
+  command -v curl >/dev/null 2>&1 || return 1
+  output="$(curl -fL \
+    --max-time 6 \
+    --connect-timeout 3 \
+    -o /dev/null \
+    -w '%{time_total}' \
+    "${url}" 2>/dev/null)" || return 1
+  [[ -n "${output}" ]] || return 1
+  echo "${output}"
+}
+
+detect_region() {
+  [[ "${REGION}" == "auto" ]] || return 0
+
+  local global_time=""
+  local cn_time=""
+  info "未指定 region，正在检测 GitHub/Gitee 连接..."
+  global_time="$(probe_url "${GLOBAL_PROBE_URL}" || true)"
+  cn_time="$(probe_url "${CN_PROBE_URL}" || true)"
+
+  if [[ -n "${global_time}" && -n "${cn_time}" ]]; then
+    if awk "BEGIN { exit !(${global_time} <= ${cn_time}) }"; then
+      REGION="global"
+    else
+      REGION="cn"
+    fi
+  elif [[ -n "${global_time}" ]]; then
+    REGION="global"
+  elif [[ -n "${cn_time}" ]]; then
+    REGION="cn"
+  else
+    warn "GitHub/Gitee 连接检测都失败，默认使用 cn 策略。"
+    REGION="cn"
+  fi
+
+  if [[ "${REGION}" == "global" ]]; then
+    ok "自动选择 region：global"
+  else
+    ok "自动选择 region：cn"
+  fi
+}
+
 archive_urls_for_region() {
   if [[ "${REGION}" == "cn" ]]; then
     printf '%s\n' "${CN_RELEASE_ARCHIVE_URL}" "${CN_SOURCE_ARCHIVE_URL}"
@@ -245,11 +300,17 @@ download_deploy_archive() {
 }
 
 line
-if [[ "${REGION}" == "cn" ]]; then
-  echo "  OrthoVennPlus 安装器 · 中国大陆镜像"
-else
-  echo "  OrthoVennPlus Installer · Global"
-fi
+case "${REGION}" in
+  cn)
+    echo "  OrthoVennPlus 安装器 · 中国大陆镜像"
+    ;;
+  global)
+    echo "  OrthoVennPlus Installer · Global"
+    ;;
+  *)
+    echo "  OrthoVennPlus 安装器 · 自动选择区域"
+    ;;
+esac
 line
 echo "  这个脚本只负责下载部署包，然后交给部署包内的 tools/install.sh。"
 line
@@ -260,6 +321,7 @@ if command -v git >/dev/null 2>&1; then
 else
   warn "未找到 git，将在获取部署包时尝试使用压缩包下载。"
 fi
+detect_region
 if is_interactive; then
   INSTALL_DIR="$(prompt_default "安装目录" "${INSTALL_DIR}")"
 fi
@@ -295,11 +357,11 @@ step 3 3 "进入安装流程"
 REGISTRY="$(registry_for_region)"
 export ORTHOVENN_INSTALL_REGION="${REGION}"
 if [[ "${REGION}" == "cn" ]]; then
-  export ORTHOVENN_REFDB_SOURCE="${ORTHOVENN_REFDB_SOURCE:-official}"
-  export ORTHOVENN_REFDB_FALLBACK_SOURCE="${ORTHOVENN_REFDB_FALLBACK_SOURCE:-gitee,github}"
+  export ORTHOVENN_REFDB_SOURCE="${ORTHOVENN_REFDB_SOURCE:-gitee}"
+  export ORTHOVENN_REFDB_FALLBACK_SOURCE="${ORTHOVENN_REFDB_FALLBACK_SOURCE:-official}"
 else
-  export ORTHOVENN_REFDB_SOURCE="${ORTHOVENN_REFDB_SOURCE:-official}"
-  export ORTHOVENN_REFDB_FALLBACK_SOURCE="${ORTHOVENN_REFDB_FALLBACK_SOURCE:-github,gitee}"
+  export ORTHOVENN_REFDB_SOURCE="${ORTHOVENN_REFDB_SOURCE:-github}"
+  export ORTHOVENN_REFDB_FALLBACK_SOURCE="${ORTHOVENN_REFDB_FALLBACK_SOURCE:-official}"
 fi
 INSTALL_ARGS=(
   --registry "${REGISTRY}"

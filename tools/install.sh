@@ -4,12 +4,14 @@ set -Eeuo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 YES=0
 REGISTRY="auto"
-REGION="${ORTHOVENN_INSTALL_REGION:-cn}"
+REGION="${ORTHOVENN_INSTALL_REGION:-auto}"
 TAG="${ORTHOVENN_IMAGE_TAG:-latest}"
 INSTALL_REFDB=1
 START_SERVICES=1
 SKIP_PULL=0
 WEB_PORT=""
+GLOBAL_PROBE_URL="${ORTHOVENN_GLOBAL_PROBE_URL:-https://raw.githubusercontent.com/Yonkers/orthovennplus/main/.env.example}"
+CN_PROBE_URL="${ORTHOVENN_CN_PROBE_URL:-https://gitee.com/leeoluo/orthovennplus-docker/raw/main/.env.example}"
 
 usage() {
   cat <<EOF
@@ -207,6 +209,62 @@ resolve_registry() {
   echo "aliyun"
 }
 
+probe_url() {
+  local url="$1"
+  local output
+  command -v curl >/dev/null 2>&1 || return 1
+  output="$(curl -fL \
+    --max-time 6 \
+    --connect-timeout 3 \
+    -o /dev/null \
+    -w '%{time_total}' \
+    "${url}" 2>/dev/null)" || return 1
+  [[ -n "${output}" ]] || return 1
+  echo "${output}"
+}
+
+detect_region() {
+  [[ "${REGION}" == "auto" ]] || return 0
+
+  local global_time=""
+  local cn_time=""
+  info "未指定 region，正在检测 GitHub/Gitee 连接..."
+  global_time="$(probe_url "${GLOBAL_PROBE_URL}" || true)"
+  cn_time="$(probe_url "${CN_PROBE_URL}" || true)"
+
+  if [[ -n "${global_time}" && -n "${cn_time}" ]]; then
+    if awk "BEGIN { exit !(${global_time} <= ${cn_time}) }"; then
+      REGION="global"
+    else
+      REGION="cn"
+    fi
+  elif [[ -n "${global_time}" ]]; then
+    REGION="global"
+  elif [[ -n "${cn_time}" ]]; then
+    REGION="cn"
+  else
+    warn "GitHub/Gitee 连接检测都失败，默认使用 cn 策略。"
+    REGION="cn"
+  fi
+
+  if [[ "${REGION}" == "global" ]]; then
+    ok "自动选择 region：global"
+  else
+    ok "自动选择 region：cn"
+  fi
+  export ORTHOVENN_INSTALL_REGION="${REGION}"
+}
+
+configure_refdb_defaults() {
+  if [[ "${REGION}" == "cn" ]]; then
+    export ORTHOVENN_REFDB_SOURCE="${ORTHOVENN_REFDB_SOURCE:-gitee}"
+    export ORTHOVENN_REFDB_FALLBACK_SOURCE="${ORTHOVENN_REFDB_FALLBACK_SOURCE:-official}"
+  else
+    export ORTHOVENN_REFDB_SOURCE="${ORTHOVENN_REFDB_SOURCE:-github}"
+    export ORTHOVENN_REFDB_FALLBACK_SOURCE="${ORTHOVENN_REFDB_FALLBACK_SOURCE:-official}"
+  fi
+}
+
 refdb_script() {
   if [[ -x "${ROOT_DIR}/install_refdb.sh" || -f "${ROOT_DIR}/install_refdb.sh" ]]; then
     echo "${ROOT_DIR}/install_refdb.sh"
@@ -235,6 +293,7 @@ ok "系统：${OS_NAME} (${ARCH_NAME})"
 if command -v df >/dev/null 2>&1; then
   info "当前目录磁盘空间：$(df -h "${ROOT_DIR}" | awk 'NR == 2 { print $4 " available" }')"
 fi
+detect_region
 
 step 2 7 "检查 Docker 环境"
 command -v docker >/dev/null 2>&1 || fail "未找到 docker。请先安装 Docker 后重新运行。"
@@ -309,6 +368,7 @@ ok "脚本权限已检查"
 
 step 6 7 "安装参考数据库"
 if [[ "${INSTALL_REFDB}" -eq 1 ]]; then
+  configure_refdb_defaults
   REFDB_SCRIPT="$(refdb_script)"
   [[ -f "${REFDB_SCRIPT}" ]] || fail "未找到参考数据库安装脚本：${REFDB_SCRIPT}"
   bash "${REFDB_SCRIPT}"
