@@ -113,6 +113,33 @@ is_interactive() {
   [[ "${YES}" -eq 0 && -r /dev/tty && -w /dev/tty ]]
 }
 
+installer_lang() {
+  case "${REGION}" in
+    cn)
+      echo "zh"
+      ;;
+    global)
+      echo "en"
+      ;;
+    *)
+      case "${LANG:-}" in
+        zh*|ZH*) echo "zh" ;;
+        *) echo "en" ;;
+      esac
+      ;;
+  esac
+}
+
+text() {
+  local zh="$1"
+  local en="$2"
+  if [[ "$(installer_lang)" == "zh" ]]; then
+    printf '%s' "${zh}"
+  else
+    printf '%s' "${en}"
+  fi
+}
+
 line() {
   printf '%s\n' '──────────────────────────────────────────────────────────────────────'
 }
@@ -120,9 +147,14 @@ line() {
 step() {
   local number="$1"
   local total="$2"
-  local title="$3"
+  local title
+  title="$(text "$3" "${4:-$3}")"
   printf '\n%s\n' '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
-  printf '第 %s 步 / %s：%s\n' "${number}" "${total}" "${title}"
+  if [[ "$(installer_lang)" == "zh" ]]; then
+    printf '第 %s 步 / %s：%s\n' "${number}" "${total}" "${title}"
+  else
+    printf 'Step %s / %s: %s\n' "${number}" "${total}" "${title}"
+  fi
   printf '%s\n' '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
 }
 
@@ -180,7 +212,7 @@ detect_region() {
 
   local global_time=""
   local cn_time=""
-  info "未指定 region，正在检测 GitHub/Gitee 连接..."
+  info "$(text "未指定 region，正在检测 GitHub/Gitee 连接..." "No region specified; testing GitHub/Gitee connectivity...")"
   global_time="$(probe_url "${GLOBAL_PROBE_URL}" || true)"
   cn_time="$(probe_url "${CN_PROBE_URL}" || true)"
 
@@ -195,14 +227,14 @@ detect_region() {
   elif [[ -n "${cn_time}" ]]; then
     REGION="cn"
   else
-    warn "GitHub/Gitee 连接检测都失败，默认使用 cn 策略。"
+    warn "$(text "GitHub/Gitee 连接检测都失败，默认使用 cn 策略。" "GitHub/Gitee connectivity checks both failed; using cn strategy by default.")"
     REGION="cn"
   fi
 
   if [[ "${REGION}" == "global" ]]; then
-    ok "自动选择 region：global"
+    ok "$(text "自动选择 region：global" "Auto-selected region: global")"
   else
-    ok "自动选择 region：cn"
+    ok "$(text "自动选择 region：cn" "Auto-selected region: cn")"
   fi
 }
 
@@ -232,7 +264,7 @@ download_file() {
   elif command -v wget >/dev/null 2>&1; then
     wget -O "${output}" "${url}"
   else
-    fail "未找到 curl 或 wget，无法下载部署包压缩包。请先安装其中一个工具。"
+    fail "$(text "未找到 curl 或 wget，无法下载部署包压缩包。请先安装其中一个工具。" "curl or wget was not found, so the deployment archive cannot be downloaded. Install one of them and rerun.")"
   fi
 }
 
@@ -246,14 +278,14 @@ extract_archive() {
       elif command -v python3 >/dev/null 2>&1; then
         python3 -m zipfile -e "${archive}" "${dest}"
       else
-        fail "未找到 unzip 或 python3，无法解压 zip 部署包。"
+        fail "$(text "未找到 unzip 或 python3，无法解压 zip 部署包。" "unzip or python3 was not found, so the zip deployment package cannot be extracted.")"
       fi
       ;;
     *.tar.gz|*.tgz)
       tar -xzf "${archive}" -C "${dest}"
       ;;
     *)
-      fail "不支持的部署包格式：${archive}"
+      fail "$(text "不支持的部署包格式：${archive}" "Unsupported deployment archive format: ${archive}")"
       ;;
   esac
 }
@@ -275,7 +307,7 @@ download_deploy_archive() {
 
   while IFS= read -r archive_url; do
     [[ -n "${archive_url}" ]] || continue
-    info "尝试下载部署包压缩包：${archive_url}"
+    info "$(text "尝试下载部署包压缩包：${archive_url}" "Trying deployment archive: ${archive_url}")"
     if download_file "${archive_url}" "${archive_path}"; then
       extract_archive "${archive_path}" "${extract_dir}"
       install_script="$(find "${extract_dir}" -type f -path '*/tools/install.sh' -print -quit)"
@@ -283,20 +315,20 @@ download_deploy_archive() {
         package_dir="${install_script%/tools/install.sh}"
         clear_install_dir
         cp -R "${package_dir}/." "${INSTALL_DIR}/"
-        ok "已从压缩包准备部署包"
+        ok "$(text "已从压缩包准备部署包" "Deployment package prepared from archive")"
         rm -rf "${tmp_dir}"
         return 0
       fi
-      warn "压缩包中未找到 tools/install.sh，继续尝试下一个来源。"
+      warn "$(text "压缩包中未找到 tools/install.sh，继续尝试下一个来源。" "tools/install.sh was not found in the archive; trying the next source.")"
       rm -rf "${extract_dir}"
       mkdir -p "${extract_dir}"
     else
-      warn "压缩包下载失败，继续尝试下一个来源。"
+      warn "$(text "压缩包下载失败，继续尝试下一个来源。" "Archive download failed; trying the next source.")"
     fi
   done < <(archive_urls_for_region)
 
   rm -rf "${tmp_dir}"
-  fail "无法通过 Git 或压缩包获取部署包。请检查网络，或手动下载 Gitee Release 压缩包后解压安装。"
+  fail "$(text "无法通过 Git 或压缩包获取部署包。请检查网络，或手动下载 Gitee Release 压缩包后解压安装。" "Could not get the deployment package via Git or archive. Check the network, or download and extract the release archive manually.")"
 }
 
 line
@@ -308,52 +340,52 @@ case "${REGION}" in
     echo "  OrthoVennPlus Installer · Global"
     ;;
   *)
-    echo "  OrthoVennPlus 安装器 · 自动选择区域"
+    echo "  $(text "OrthoVennPlus 安装器 · 自动选择区域" "OrthoVennPlus Installer · Auto region")"
     ;;
 esac
 line
-echo "  这个脚本只负责下载部署包，然后交给部署包内的 tools/install.sh。"
+echo "  $(text "这个脚本只负责下载部署包，然后交给部署包内的 tools/install.sh。" "This script only downloads the deployment package, then hands off to tools/install.sh inside it.")"
 line
 
-step 1 3 "准备部署目录"
+step 1 3 "准备部署目录" "Prepare deployment directory"
 if command -v git >/dev/null 2>&1; then
-  ok "已找到 git：$(git --version)"
+  ok "$(text "已找到 git：$(git --version)" "Found git: $(git --version)")"
 else
-  warn "未找到 git，将在获取部署包时尝试使用压缩包下载。"
+  warn "$(text "未找到 git，将在获取部署包时尝试使用压缩包下载。" "git was not found; archive download will be used when getting the deployment package.")"
 fi
 detect_region
 if is_interactive; then
-  INSTALL_DIR="$(prompt_default "安装目录" "${INSTALL_DIR}")"
+  INSTALL_DIR="$(prompt_default "$(text "安装目录" "Install directory")" "${INSTALL_DIR}")"
 fi
 INSTALL_DIR="${INSTALL_DIR%/}"
-info "安装目录：${INSTALL_DIR}"
+info "$(text "安装目录：${INSTALL_DIR}" "Install directory: ${INSTALL_DIR}")"
 
-step 2 3 "获取部署包"
+step 2 3 "获取部署包" "Get deployment package"
 REPO_URL="$(repo_url_for_region)"
-info "部署包来源：${REPO_URL}"
-mkdir -p "${INSTALL_DIR}" || fail "无法创建安装目录：${INSTALL_DIR}。请换一个当前用户可写的目录，或使用 --dir 指定。"
+info "$(text "部署包来源：${REPO_URL}" "Deployment package source: ${REPO_URL}")"
+mkdir -p "${INSTALL_DIR}" || fail "$(text "无法创建安装目录：${INSTALL_DIR}。请换一个当前用户可写的目录，或使用 --dir 指定。" "Could not create install directory: ${INSTALL_DIR}. Choose a writable directory, or pass --dir.")"
 if [[ -z "$(find "${INSTALL_DIR}" -mindepth 1 -maxdepth 1 2>/dev/null)" ]]; then
   if command -v git >/dev/null 2>&1 && git clone "${REPO_URL}" "${INSTALL_DIR}"; then
-    ok "已通过 Git 获取部署包"
+    ok "$(text "已通过 Git 获取部署包" "Deployment package downloaded via Git")"
   else
-    warn "Git 获取部署包失败，尝试下载部署包压缩包。"
+    warn "$(text "Git 获取部署包失败，尝试下载部署包压缩包。" "Git failed to get the deployment package; trying archive download.")"
     download_deploy_archive
   fi
 elif [[ -d "${INSTALL_DIR}/.git" ]]; then
   if [[ "${SKIP_DEPLOY_PULL}" -eq 1 ]]; then
-    info "目录已存在，已跳过部署包 git pull。"
+    info "$(text "目录已存在，已跳过部署包 git pull。" "Directory already exists; skipped deployment package git pull.")"
   elif command -v git >/dev/null 2>&1; then
-    info "目录已存在，尝试更新部署包..."
-    git -C "${INSTALL_DIR}" pull --ff-only || warn "更新部署包失败，将继续使用当前目录中的文件。"
+    info "$(text "目录已存在，尝试更新部署包..." "Directory already exists; trying to update deployment package...")"
+    git -C "${INSTALL_DIR}" pull --ff-only || warn "$(text "更新部署包失败，将继续使用当前目录中的文件。" "Deployment package update failed; continuing with current files.")"
   else
-    warn "未找到 git，将继续使用当前目录中的文件。"
+    warn "$(text "未找到 git，将继续使用当前目录中的文件。" "git was not found; continuing with current files.")"
   fi
 else
-  fail "安装目录已存在且不是空目录或 Git 仓库：${INSTALL_DIR}"
+  fail "$(text "安装目录已存在且不是空目录或 Git 仓库：${INSTALL_DIR}" "Install directory already exists and is neither empty nor a Git repository: ${INSTALL_DIR}")"
 fi
-ok "部署包已就绪"
+ok "$(text "部署包已就绪" "Deployment package is ready")"
 
-step 3 3 "进入安装流程"
+step 3 3 "进入安装流程" "Enter installation flow"
 REGISTRY="$(registry_for_region)"
 export ORTHOVENN_INSTALL_REGION="${REGION}"
 if [[ "${REGION}" == "cn" ]]; then
@@ -385,7 +417,7 @@ fi
 
 INSTALL_SCRIPT="${INSTALL_DIR}/tools/install.sh"
 if [[ ! -f "${INSTALL_SCRIPT}" ]]; then
-  fail "部署包缺少 tools/install.sh。请先运行 tools/sync_deploy_repo.sh 同步并推送部署仓库，然后重新执行安装。"
+  fail "$(text "部署包不完整，缺少安装脚本。请删除当前安装目录后重新运行安装命令。" "The deployment package is incomplete and the installer script is missing. Delete the current install directory and rerun the installation command.")"
 fi
 
 bash "${INSTALL_SCRIPT}" "${INSTALL_ARGS[@]}"
