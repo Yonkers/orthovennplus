@@ -56,6 +56,7 @@ orthovennplus-docker/
 |   |   |-- sonicparanoid2/     # optional
 |-- run.sh
 |-- docker-compose.yaml
+|-- .env
 |-- .env.example
 |-- install_refdb.sh
 |-- install_sonic_pfam_profiles.sh
@@ -71,46 +72,14 @@ If the scripts are not executable after cloning or unpacking a release package, 
 chmod +x run.sh install_refdb.sh install_sonic_pfam_profiles.sh
 ```
 
-### 2. Create the Environment File
+### 2. Review Optional Configuration
 
-The deployment package includes `.env.example`. Copy it to `.env`:
+The deployment package includes a ready-to-use `.env` file. For a standard single-server deployment, you can keep the defaults and continue.
 
-```bash
-cp .env.example .env
-```
+Optional: edit `.env` if you need to change the web port, storage policy, upload domain, email service, or other deployment details. See [Advanced Configuration](#advanced-configuration).
 
-Then replace passwords, and the secret key. Review these key startup settings:
+If `.env` is missing, create it from the example file: `cp .env.example .env` 
 
-```dotenv
-ORTHOVENN_IMAGE_TAG=latest
-
-API_PORT=18008
-# Web port opened by users in the browser.
-NGINX_PORT=18088
-POSTGRES_PORT=15435
-REDIS_PORT=16379
-
-POSTGRES_USER=orthovennplus
-# Replace with a strong database password.
-POSTGRES_PASSWORD=change-this-postgres-password
-POSTGRES_DB=orthovennplus
-
-# Required for login tokens. Use a long random value.
-SECRET_KEY=change-this-secret-key
-ACCESS_TOKEN_EXPIRE_MINUTES=4320
-FIRST_REGISTERED_USER_AS_ADMIN=true
-
-CELERY_CONCURRENCY=3
-INTERACTIVE_WORKER_CONCURRENCY=2
-SELECTION_WORKER_CONCURRENCY=1
-# Default CPU threads used by analysis modules.
-MODULE_DEFAULT_THREADS=16
-MODULE_THREAD_EDITABLE=true
-
-UPLOAD_MAX_FILE_SIZE=10737418240
-# 0 means no species count limit.
-PROJECT_SPECIES_LIMIT=20
-```
 
 ### 3. Install Reference Data
 
@@ -138,18 +107,18 @@ SonicParanoid2 works in graph-only mode by default. If you plan to use full Soni
 
 ### 4. Start with run.sh
 
-The recommended startup command is `run.sh`. It creates required data directories, pulls images, runs database migrations, and starts the Docker Compose services:
+The recommended startup command is `run.sh`. On most servers, run it with `sudo` unless your user already has Docker permissions. The script creates required data directories, pulls images, runs database migrations, normalizes writable data directory permissions, and starts the Docker Compose services:
 
 Start the services:
 
 ```bash
-./run.sh
+sudo ./run.sh
 ```
 
 By default, `run.sh` pulls images from Docker Hub. If the server is in mainland China or Docker Hub access is slow, use the Aliyun mirror registry:
 
 ```bash
-./run.sh --registry aliyun
+sudo ./run.sh --registry aliyun
 ```
 
 Check the available options:
@@ -169,7 +138,7 @@ http://<server-ip>:5920
 Check service status when needed:
 
 ```bash
-docker compose ps
+sudo docker compose ps
 ```
 
 ### Manual Docker Compose Startup
@@ -182,6 +151,31 @@ mkdir -p data/refdb/sonicparanoid2
 docker compose up -d postgres redis
 docker compose run --rm backend alembic upgrade head
 docker compose up -d
+```
+
+## Advanced Configuration
+
+Most deployments can keep the default `.env` file. Edit it only when you need to adapt ports, credentials, upload behavior, resource usage, cleanup policy, or email service.
+
+Common settings:
+
+| Setting | Purpose |
+| --- | --- |
+| `WEB_PORT` | Browser access port for the web UI. |
+| `API_PORT`, `NGINX_PORT`, `POSTGRES_PORT`, `REDIS_PORT` | Host ports exposed by backend services. Change them only when ports conflict. |
+| `POSTGRES_PASSWORD`, `SECRET_KEY` | Security-sensitive values. Use strong values for public or long-running deployments. |
+| `CELERY_CONCURRENCY`, `INTERACTIVE_WORKER_CONCURRENCY`, `SELECTION_WORKER_CONCURRENCY` | Worker concurrency. Increase only when the server has enough CPU and memory. |
+| `MODULE_DEFAULT_THREADS` | Default CPU threads used by analysis modules. |
+| `UPLOAD_MAX_FILE_SIZE`, `PUBLIC_TUS_ENDPOINT`, `TUSD_CORS_ALLOW_ORIGIN` | Upload size and TUS upload endpoint/CORS behavior. |
+| `PROJECT_SPECIES_LIMIT`, `PROJECT_VERSION_LIMIT` | Project and version limits. |
+| `PROJECT_RETENTION_DAYS`, `PROJECT_CLEANUP_STALE_ACTIVE_HOURS` | Project retention and stale-task cleanup policy. |
+| `MAIL_ENABLED`, `MAIL_SMTP_*` | Optional email verification and password reset service. |
+| `ORTHOVENN_IMAGE_TAG` | Docker image version used by `run.sh`. |
+
+If you change `.env` after services are already running, restart the stack:
+
+```bash
+sudo ./run.sh --skip-pull --skip-migrate
 ```
 
 ## Administrator Account
