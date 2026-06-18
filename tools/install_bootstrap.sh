@@ -39,9 +39,9 @@ Options:
   -h, --help          Show this help
 
 Examples:
-  curl -fsSL https://example.com/install-cn.sh | bash
-  curl -fsSL https://example.com/install.sh | bash
-  curl -fsSL https://example.com/install-cn.sh | bash -s -- --dir /data/orthovennplus
+  curl -fsSL https://gitee.com/leeoluo/orthovennplus-docker/raw/main/tools/install_bootstrap.sh | bash -s -- --region cn
+  curl -fsSL https://raw.githubusercontent.com/Yonkers/orthovennplus/main/tools/install_bootstrap.sh | bash -s -- --region global
+  curl -fsSL https://gitee.com/leeoluo/orthovennplus-docker/raw/main/tools/install_bootstrap.sh | bash -s -- --region cn --dir /data/orthovennplus
 EOF
 }
 
@@ -100,7 +100,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 is_interactive() {
-  [[ "${YES}" -eq 0 && -t 0 ]]
+  [[ "${YES}" -eq 0 && -r /dev/tty && -w /dev/tty ]]
 }
 
 line() {
@@ -138,7 +138,7 @@ prompt_default() {
   local default="$2"
   local value=""
   if is_interactive; then
-    read -r -p "${prompt} [${default}]: " value
+    read -r -p "${prompt} [${default}]: " value </dev/tty
   fi
   echo "${value:-${default}}"
 }

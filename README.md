@@ -34,13 +34,13 @@ For a new server, use the installer script. It downloads the deployment package 
 Global source:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Yonkers/orthovennplus/main/tools/install_bootstrap_global.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Yonkers/orthovennplus/main/tools/install_bootstrap.sh | bash -s -- --region global
 ```
 
 Mainland China source:
 
 ```bash
-curl -fsSL https://gitee.com/leeoluo/orthovennplus-docker/raw/main/tools/install_bootstrap_cn.sh | bash
+curl -fsSL https://gitee.com/leeoluo/orthovennplus-docker/raw/main/tools/install_bootstrap.sh | bash -s -- --region cn
 ```
 
 After installation, open:
@@ -87,8 +87,6 @@ orthovennplus-docker/
 |-- tools/
 |   |-- install.sh
 |   |-- install_bootstrap.sh
-|   |-- install_bootstrap_cn.sh
-|   |-- install_bootstrap_global.sh
 |-- data/                     # created during installation/runtime
 |   |-- refdb/                # reference data installed by install_refdb.sh
 |   |-- projects/

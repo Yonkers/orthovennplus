@@ -72,7 +72,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 is_interactive() {
-  [[ "${YES}" -eq 0 && -t 0 ]]
+  [[ "${YES}" -eq 0 && -r /dev/tty && -w /dev/tty ]]
 }
 
 line() {
@@ -110,7 +110,7 @@ prompt_default() {
   local default="$2"
   local value=""
   if is_interactive; then
-    read -r -p "${prompt} [${default}]: " value
+    read -r -p "${prompt} [${default}]: " value </dev/tty
   fi
   echo "${value:-${default}}"
 }
@@ -121,7 +121,7 @@ confirm_default_yes() {
   if ! is_interactive; then
     return 0
   fi
-  read -r -p "${prompt} [Y/n]: " value
+  read -r -p "${prompt} [Y/n]: " value </dev/tty
   [[ -z "${value}" || "${value}" =~ ^[Yy]$ ]]
 }
 
