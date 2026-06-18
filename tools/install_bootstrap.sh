@@ -9,11 +9,15 @@ YES=0
 INSTALL_REFDB=1
 START_SERVICES=1
 SKIP_PULL=0
+SKIP_DEPLOY_PULL=0
 WEB_PORT=""
 REGISTRY=""
 
 GLOBAL_REPO_URL="${ORTHOVENN_DEPLOY_GLOBAL_REPO:-https://github.com/Yonkers/orthovennplus.git}"
 CN_REPO_URL="${ORTHOVENN_DEPLOY_CN_REPO:-https://gitee.com/leeoluo/orthovennplus-docker.git}"
+GLOBAL_RELEASE_ARCHIVE_URL="${ORTHOVENN_DEPLOY_GLOBAL_RELEASE_ARCHIVE_URL:-https://github.com/Yonkers/orthovennplus/archive/refs/heads/main.zip}"
+CN_RELEASE_ARCHIVE_URL="${ORTHOVENN_DEPLOY_CN_RELEASE_ARCHIVE_URL:-https://gitee.com/leeoluo/orthovennplus-docker/releases/download/latest/orthovennplus-docker.zip}"
+CN_SOURCE_ARCHIVE_URL="${ORTHOVENN_DEPLOY_CN_SOURCE_ARCHIVE_URL:-https://gitee.com/leeoluo/orthovennplus-docker/repository/archive/main.zip}"
 
 usage() {
   cat <<EOF
@@ -29,6 +33,7 @@ Options:
   --web-port PORT     Forward Web UI port to tools/install.sh
   --skip-refdb        Skip reference database installation
   --skip-pull         Skip Docker image pull when starting services
+  --skip-deploy-pull  Skip git pull when the deployment directory already exists
   --no-start          Prepare files only; do not start Docker services
   -y, --yes           Non-interactive mode; accept defaults
   -h, --help          Show this help
@@ -68,6 +73,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --skip-pull)
       SKIP_PULL=1
+      shift
+      ;;
+    --skip-deploy-pull)
+      SKIP_DEPLOY_PULL=1
       shift
       ;;
     --no-start)
@@ -142,6 +151,14 @@ repo_url_for_region() {
   fi
 }
 
+archive_urls_for_region() {
+  if [[ "${REGION}" == "cn" ]]; then
+    printf '%s\n' "${CN_RELEASE_ARCHIVE_URL}" "${CN_SOURCE_ARCHIVE_URL}"
+  else
+    printf '%s\n' "${GLOBAL_RELEASE_ARCHIVE_URL}"
+  fi
+}
+
 registry_for_region() {
   if [[ -n "${REGISTRY}" ]]; then
     echo "${REGISTRY}"
@@ -150,6 +167,81 @@ registry_for_region() {
   else
     echo "dockerhub"
   fi
+}
+
+download_file() {
+  local url="$1"
+  local output="$2"
+  if command -v curl >/dev/null 2>&1; then
+    curl -fL --retry 3 --connect-timeout 15 -o "${output}" "${url}"
+  elif command -v wget >/dev/null 2>&1; then
+    wget -O "${output}" "${url}"
+  else
+    fail "未找到 curl 或 wget，无法下载部署包压缩包。请先安装其中一个工具。"
+  fi
+}
+
+extract_archive() {
+  local archive="$1"
+  local dest="$2"
+  case "${archive}" in
+    *.zip)
+      if command -v unzip >/dev/null 2>&1; then
+        unzip -q "${archive}" -d "${dest}"
+      elif command -v python3 >/dev/null 2>&1; then
+        python3 -m zipfile -e "${archive}" "${dest}"
+      else
+        fail "未找到 unzip 或 python3，无法解压 zip 部署包。"
+      fi
+      ;;
+    *.tar.gz|*.tgz)
+      tar -xzf "${archive}" -C "${dest}"
+      ;;
+    *)
+      fail "不支持的部署包格式：${archive}"
+      ;;
+  esac
+}
+
+clear_install_dir() {
+  find "${INSTALL_DIR}" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+}
+
+download_deploy_archive() {
+  local tmp_dir
+  local archive_path
+  local extract_dir
+  local install_script
+  local package_dir
+  tmp_dir="$(mktemp -d)"
+  archive_path="${tmp_dir}/orthovennplus-deploy.zip"
+  extract_dir="${tmp_dir}/extract"
+  mkdir -p "${extract_dir}"
+
+  while IFS= read -r archive_url; do
+    [[ -n "${archive_url}" ]] || continue
+    info "尝试下载部署包压缩包：${archive_url}"
+    if download_file "${archive_url}" "${archive_path}"; then
+      extract_archive "${archive_path}" "${extract_dir}"
+      install_script="$(find "${extract_dir}" -type f -path '*/tools/install.sh' -print -quit)"
+      if [[ -n "${install_script}" ]]; then
+        package_dir="${install_script%/tools/install.sh}"
+        clear_install_dir
+        cp -R "${package_dir}/." "${INSTALL_DIR}/"
+        ok "已从压缩包准备部署包"
+        rm -rf "${tmp_dir}"
+        return 0
+      fi
+      warn "压缩包中未找到 tools/install.sh，继续尝试下一个来源。"
+      rm -rf "${extract_dir}"
+      mkdir -p "${extract_dir}"
+    else
+      warn "压缩包下载失败，继续尝试下一个来源。"
+    fi
+  done < <(archive_urls_for_region)
+
+  rm -rf "${tmp_dir}"
+  fail "无法通过 Git 或压缩包获取部署包。请检查网络，或手动下载 Gitee Release 压缩包后解压安装。"
 }
 
 line
@@ -163,8 +255,11 @@ echo "  这个脚本只负责下载部署包，然后交给部署包内的 tools
 line
 
 step 1 3 "准备部署目录"
-command -v git >/dev/null 2>&1 || fail "未找到 git。请先安装 git 后重新运行。"
-ok "已找到 git：$(git --version)"
+if command -v git >/dev/null 2>&1; then
+  ok "已找到 git：$(git --version)"
+else
+  warn "未找到 git，将在获取部署包时尝试使用压缩包下载。"
+fi
 if is_interactive; then
   INSTALL_DIR="$(prompt_default "安装目录" "${INSTALL_DIR}")"
 fi
@@ -176,10 +271,21 @@ REPO_URL="$(repo_url_for_region)"
 info "部署包来源：${REPO_URL}"
 mkdir -p "${INSTALL_DIR}" || fail "无法创建安装目录：${INSTALL_DIR}。请换一个当前用户可写的目录，或使用 --dir 指定。"
 if [[ -z "$(find "${INSTALL_DIR}" -mindepth 1 -maxdepth 1 2>/dev/null)" ]]; then
-  git clone "${REPO_URL}" "${INSTALL_DIR}"
+  if command -v git >/dev/null 2>&1 && git clone "${REPO_URL}" "${INSTALL_DIR}"; then
+    ok "已通过 Git 获取部署包"
+  else
+    warn "Git 获取部署包失败，尝试下载部署包压缩包。"
+    download_deploy_archive
+  fi
 elif [[ -d "${INSTALL_DIR}/.git" ]]; then
-  info "目录已存在，尝试更新部署包..."
-  git -C "${INSTALL_DIR}" pull --ff-only
+  if [[ "${SKIP_DEPLOY_PULL}" -eq 1 ]]; then
+    info "目录已存在，已跳过部署包 git pull。"
+  elif command -v git >/dev/null 2>&1; then
+    info "目录已存在，尝试更新部署包..."
+    git -C "${INSTALL_DIR}" pull --ff-only || warn "更新部署包失败，将继续使用当前目录中的文件。"
+  else
+    warn "未找到 git，将继续使用当前目录中的文件。"
+  fi
 else
   fail "安装目录已存在且不是空目录或 Git 仓库：${INSTALL_DIR}"
 fi

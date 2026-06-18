@@ -27,7 +27,33 @@ Recommended minimum for a small test deployment:
 
 ## Quick Start
 
-### 1. Get the Deployment Package
+### Recommended: One-command Installation
+
+For a new server, use the installer script. It downloads the deployment package to `~/orthovennplus` by default, prepares `.env`, installs the reference database, and starts the Docker services.
+
+Global source:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Yonkers/orthovennplus/main/tools/install_bootstrap_global.sh | bash
+```
+
+Mainland China source:
+
+```bash
+curl -fsSL https://gitee.com/leeoluo/orthovennplus-docker/raw/main/tools/install_bootstrap_cn.sh | bash
+```
+
+After installation, open:
+
+```text
+http://<server-ip>:5920
+```
+
+### Manual Installation
+
+Use the manual steps below when you need to inspect or customize the deployment package before starting services.
+
+#### 1. Get the Deployment Package
 
 Clone or unpack the deployment package on the server. Choose one source:
 
@@ -47,13 +73,6 @@ The deployment directory should use this layout:
 
 ```text
 orthovennplus-docker/
-|-- data/
-|   |-- refdb/
-|   |   |-- go-basic.obo
-|   |   |-- go_terms.tsv
-|   |   |-- uniprot_sprot_annotation.dmnd
-|   |   |-- uniprot_sprot_annotation.tsv
-|   |   |-- sonicparanoid2/     # optional
 |-- run.sh
 |-- docker-compose.yaml
 |-- .env
@@ -61,6 +80,20 @@ orthovennplus-docker/
 |-- install_refdb.sh
 |-- install_sonic_pfam_profiles.sh
 |-- setup_uniprot_refdb.py
+|-- docker/
+|   |-- nginx/
+|   |   |-- default.conf
+|   |   |-- frontend.conf.template
+|-- tools/
+|   |-- install.sh
+|   |-- install_bootstrap.sh
+|   |-- install_bootstrap_cn.sh
+|   |-- install_bootstrap_global.sh
+|-- data/                     # created during installation/runtime
+|   |-- refdb/                # reference data installed by install_refdb.sh
+|   |-- projects/
+|   |-- uploads/
+|   |-- logs/
 |-- README.md
 ```
 
@@ -69,10 +102,10 @@ The files under `data/refdb` are used by GO annotation and DIAMOND-based annotat
 If the scripts are not executable after cloning or unpacking a release package, set the executable bit before running any installer or startup script:
 
 ```bash
-chmod +x run.sh install_refdb.sh install_sonic_pfam_profiles.sh
+chmod +x run.sh install_refdb.sh install_sonic_pfam_profiles.sh tools/install*.sh
 ```
 
-### 2. Review Optional Configuration
+#### 2. Review Optional Configuration
 
 The deployment package includes a ready-to-use `.env` file. For a standard single-server deployment, you can keep the defaults and continue.
 
@@ -81,9 +114,13 @@ Optional: edit `.env` if you need to change the web port, storage policy, upload
 If `.env` is missing, create it from the example file: `cp .env.example .env` 
 
 
-### 3. Install Reference Data
+#### 3. Install Reference Data
 
 Install the required reference data. By default, the installer downloads from the official OrthoVennPlus web source and falls back to GitHub or Gitee if the official source is unavailable:
+
+```bash
+./install_refdb.sh
+```
 
 To force GitHub release downloads:
 
@@ -105,9 +142,9 @@ python setup_uniprot_refdb.py
 
 SonicParanoid2 works in graph-only mode by default. If you plan to use full SonicParanoid2 architecture/domain mode, install the optional Pfam profile database later from [Optional SonicParanoid2 Pfam Profile DB](#optional-sonicparanoid2-pfam-profile-db).
 
-### 4. Start with run.sh
+#### 4. Start with run.sh
 
-The recommended startup command is `run.sh`. On most servers, run it with `sudo` unless your user already has Docker permissions. The script creates required data directories, pulls images, runs database migrations, normalizes writable data directory permissions, and starts the Docker Compose services:
+The recommended startup command is `run.sh`. On most servers, run it with `sudo`. The script creates required data directories, pulls images, runs database migrations, normalizes writable data directory permissions, and starts the Docker Compose services:
 
 Start the services:
 
@@ -127,7 +164,7 @@ Check the available options:
 ./run.sh --help
 ```
 
-### 5. Open the Website
+#### 5. Open the Website
 
 After the services start, open:
 
@@ -141,7 +178,7 @@ Check service status when needed:
 sudo docker compose ps
 ```
 
-### Manual Docker Compose Startup
+#### Manual Docker Compose Startup
 
 Use this only when you do not want to use `run.sh`:
 
