@@ -1,0 +1,45 @@
+<svg width="320" height="72" viewBox="0 0 320 72" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">OrthoVennPlus logo</title>
+  <desc id="desc">A refined scientific logo built from overlapping Venn sets for orthologous cluster analysis.</desc>
+  <defs>
+    <linearGradient id="ovp-card" x1="8" y1="8" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F8FBFF"/>
+      <stop offset="1" stop-color="#FFFFFF"/>
+    </linearGradient>
+    <linearGradient id="ovp-ring-blue" x1="16" y1="16" x2="43" y2="45" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2563EB"/>
+      <stop offset="1" stop-color="#1D72F3"/>
+    </linearGradient>
+    <linearGradient id="ovp-ring-teal" x1="35" y1="17" x2="56" y2="45" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#14B8A6"/>
+      <stop offset="1" stop-color="#0F9FAD"/>
+    </linearGradient>
+    <linearGradient id="ovp-ring-gold" x1="24" y1="38" x2="50" y2="56" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FBBF24"/>
+      <stop offset="1" stop-color="#D97706"/>
+    </linearGradient>
+    <linearGradient id="ovp-word" x1="76" y1="20" x2="248" y2="54" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1D72F3"/>
+      <stop offset="0.58" stop-color="#176B87"/>
+      <stop offset="1" stop-color="#0F766E"/>
+    </linearGradient>
+    <filter id="ovp-soft-shadow" x="0" y="0" width="72" height="72" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="6" stdDeviation="7" flood-color="#0F2747" flood-opacity="0.14"/>
+    </filter>
+  </defs>
+
+  <g filter="url(#ovp-soft-shadow)">
+    <rect x="8" y="8" width="56" height="56" rx="14" fill="url(#ovp-card)"/>
+    <rect x="8.75" y="8.75" width="54.5" height="54.5" rx="13.25" stroke="#D8E4F3" stroke-width="1.5"/>
+
+    <circle cx="29.5" cy="30.5" r="14.25" fill="#2563EB" fill-opacity="0.17" stroke="url(#ovp-ring-blue)" stroke-opacity="0.58" stroke-width="1.65"/>
+    <circle cx="42.5" cy="30.5" r="14.25" fill="#14B8A6" fill-opacity="0.17" stroke="url(#ovp-ring-teal)" stroke-opacity="0.58" stroke-width="1.65"/>
+    <circle cx="36" cy="42.5" r="14.25" fill="#F59E0B" fill-opacity="0.18" stroke="url(#ovp-ring-gold)" stroke-opacity="0.54" stroke-width="1.65"/>
+  </g>
+
+  <g aria-hidden="true">
+    <text x="78" y="34" fill="url(#ovp-word)" font-family="Avenir Next, Segoe UI, system-ui, sans-serif" font-size="24" font-weight="800" letter-spacing="0">OrthoVenn</text>
+    <text x="218" y="34" fill="#0F9FAD" font-family="Avenir Next, Segoe UI, system-ui, sans-serif" font-size="24" font-weight="800" letter-spacing="0">Plus</text>
+    <text x="80" y="52" fill="#52677C" font-family="Avenir Next, Segoe UI, system-ui, sans-serif" font-size="10.8" font-weight="700" letter-spacing="0.45">ORTHOLOGY / EVOLUTION / SYNTENY</text>
+  </g>
+</svg>

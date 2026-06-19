@@ -1,10 +1,28 @@
+<p align="center">
+  <a href="https://orthovenn.com" target="_blank">
+    <img src="assets/orthovennplus-logo.svg" alt="OrthoVennPlus" width="88" />
+  </a>
+</p>
+
+<h1 align="center">OrthoVennPlus Docker Deployment</h1>
+
+<p align="center">
+  Local Docker deployment package for OrthoVennPlus.
+</p>
+
+<p align="center">
+  <a href="README.md"><strong>English</strong></a>
+  ·
+  <a href="README.zh-CN.md">中文</a>
+  ·
+  <a href="https://orthovenn.com" target="_blank">Official Website</a>
+  ·
+  <a href="https://orthovenn.com/document" target="_blank">User Manual</a>
+</p>
+
 ---
-title: OrthoVennPlus Installation
-description: Install OrthoVennPlus with run.sh or Docker Compose, create the first administrator account, and verify the deployment.
-navigation:
-  title: Installation
-  order: 1
----
+
+
 
 # OrthoVennPlus Installation
 
