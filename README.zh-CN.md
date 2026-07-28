@@ -221,7 +221,7 @@ docker compose up -d
 | `MODULE_DEFAULT_THREADS` | 分析模块默认使用的 CPU 线程数。 |
 | `UPLOAD_MAX_FILE_SIZE`、`PUBLIC_TUS_ENDPOINT`、`TUSD_CORS_ALLOW_ORIGIN` | 上传大小、TUS 上传入口和跨域规则。 |
 | `PROJECT_SPECIES_LIMIT`、`PROJECT_VERSION_LIMIT` | 项目物种数和版本数限制。 |
-| `PROJECT_RETENTION_DAYS`、`PROJECT_CLEANUP_STALE_ACTIVE_HOURS` | 项目保留时间和异常任务清理策略。 |
+| `PROJECT_RETENTION_DAYS`、`PROJECT_CLEANUP_STALE_ACTIVE_HOURS` | 新用户的默认项目保留天数和异常任务清理策略；`PROJECT_RETENTION_DAYS=0` 表示永不过期。已有用户可在管理后台将保留天数设置为 `0`。 |
 | `MAIL_ENABLED`、`MAIL_SMTP_*` | 可选的邮箱验证和找回密码服务。 |
 | `ORTHOVENN_IMAGE_TAG` | `run.sh` 使用的 Docker 镜像版本。 |
 

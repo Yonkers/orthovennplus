@@ -223,7 +223,7 @@ Common settings:
 | `MODULE_DEFAULT_THREADS` | Default CPU threads used by analysis modules. |
 | `UPLOAD_MAX_FILE_SIZE`, `PUBLIC_TUS_ENDPOINT`, `TUSD_CORS_ALLOW_ORIGIN` | Upload size and TUS upload endpoint/CORS behavior. |
 | `PROJECT_SPECIES_LIMIT`, `PROJECT_VERSION_LIMIT` | Project and version limits. |
-| `PROJECT_RETENTION_DAYS`, `PROJECT_CLEANUP_STALE_ACTIVE_HOURS` | Project retention and stale-task cleanup policy. |
+| `PROJECT_RETENTION_DAYS`, `PROJECT_CLEANUP_STALE_ACTIVE_HOURS` | Default project retention for new users and stale-task cleanup policy. `PROJECT_RETENTION_DAYS=0` means projects never expire; set existing users to `0` in the admin panel. |
 | `MAIL_ENABLED`, `MAIL_SMTP_*` | Optional email verification and password reset service. |
 | `ORTHOVENN_IMAGE_TAG` | Docker image version used by `run.sh`. |
 
