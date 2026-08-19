@@ -1,13 +1,13 @@
 <p align="center">
   <a href="https://orthovenn.com" target="_blank">
-    <img src="assets/orthovennplus-logo.svg" alt="OrthoVennPlus" width="88" />
+    <img src="assets/orthovennplus-logo.svg" alt="OrthoVenn4" width="88" />
   </a>
 </p>
 
-<h1 align="center">OrthoVennPlus Docker Deployment</h1>
+<h1 align="center">OrthoVenn4 Docker Deployment</h1>
 
 <p align="center">
-  Local Docker deployment package for OrthoVennPlus.
+  Local Docker deployment package for OrthoVenn4.
 </p>
 
 <p align="center">
@@ -24,9 +24,9 @@
 
 
 
-# OrthoVennPlus Installation
+# OrthoVenn4 Installation
 
-This guide covers the normal installation path for OrthoVennPlus from the deployment package. It focuses on preparing the deployment directory, starting the platform, creating the administrator account, and checking that the workflow service is ready.
+This guide covers the normal installation path for OrthoVenn4 from the deployment package. It focuses on preparing the deployment directory, starting the platform, creating the administrator account, and checking that the workflow service is ready.
 
 ## Requirements
 
@@ -134,7 +134,7 @@ If `.env` is missing, create it from the example file: `cp .env.example .env`
 
 #### 3. Install Reference Data
 
-Install the required reference data. The installer chooses the default download source by region: global installations use GitHub first, mainland China installations use Gitee first, and both fall back to the official OrthoVennPlus web source if needed:
+Install the required reference data. The installer chooses the default download source by region: global installations use GitHub first, mainland China installations use Gitee first, and both fall back to the official OrthoVenn4 web source if needed:
 
 ```bash
 ./install_refdb.sh

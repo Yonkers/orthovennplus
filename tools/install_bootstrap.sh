@@ -25,7 +25,7 @@ usage() {
   cat <<EOF
 Usage: install_bootstrap.sh [options]
 
-Download the OrthoVennPlus deployment package and hand off to tools/install.sh.
+Download the OrthoVenn4 deployment package and hand off to tools/install.sh.
 
 Options:
   --region cn|global|auto
@@ -334,13 +334,13 @@ download_deploy_archive() {
 line
 case "${REGION}" in
   cn)
-    echo "  OrthoVennPlus 安装器 · 中国大陆镜像"
+    echo "  OrthoVenn4 安装器 · 中国大陆镜像"
     ;;
   global)
-    echo "  OrthoVennPlus Installer · Global"
+    echo "  OrthoVenn4 Installer · Global"
     ;;
   *)
-    echo "  $(text "OrthoVennPlus 安装器 · 自动选择区域" "OrthoVennPlus Installer · Auto region")"
+    echo "  $(text "OrthoVenn4 安装器 · 自动选择区域" "OrthoVenn4 Installer · Auto region")"
     ;;
 esac
 line

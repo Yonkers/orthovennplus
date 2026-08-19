@@ -17,7 +17,7 @@ usage() {
   cat <<EOF
 Usage: tools/install.sh [options]
 
-Install OrthoVennPlus from an already downloaded deployment package.
+Install OrthoVenn4 from an already downloaded deployment package.
 
 Options:
   --registry VALUE    Image registry: auto, dockerhub, aliyun, or registry host. Default: ${REGISTRY}
@@ -310,7 +310,7 @@ run_script() {
 }
 
 line
-echo "  $(text "OrthoVennPlus 安装器" "OrthoVennPlus Installer")"
+echo "  $(text "OrthoVenn4 安装器" "OrthoVenn4 Installer")"
 line
 echo "  $(text "部署目录：${ROOT_DIR}" "Deployment directory: ${ROOT_DIR}")"
 echo "  $(text "安装目标：准备配置、参考数据库、Docker 服务" "Install target: configuration, reference database, and Docker services")"

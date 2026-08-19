@@ -44,7 +44,7 @@ usage() {
   cat <<EOF
 Usage: ./install_refdb.sh [status|install] [options]
 
-Install OrthoVennPlus reference data into data/refdb from a release asset.
+Install OrthoVenn4 reference data into data/refdb from a release asset.
 Run this script from the deployment directory.
 
 Options:
@@ -97,7 +97,7 @@ warn() {
 source_label() {
   case "$1" in
     official)
-      echo "official OrthoVennPlus server"
+      echo "official OrthoVenn4 server"
       ;;
     github)
       echo "GitHub release"
@@ -448,7 +448,7 @@ install_refdb() {
     status_refdb
     return
   fi
-  log "Installing OrthoVennPlus reference data."
+  log "Installing OrthoVenn4 reference data."
   log "Destination: ${REFDB_DIR}"
   log "Download cache: ${DOWNLOAD_DIR}"
   if [[ -z "${ARCHIVE_SOURCE}" && -z "${ARCHIVE_URL}" ]]; then

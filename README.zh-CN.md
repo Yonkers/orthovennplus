@@ -1,13 +1,13 @@
 <p align="center">
   <a href="https://orthovenn.com" target="_blank">
-    <img src="assets/orthovennplus-logo.svg" alt="OrthoVennPlus" width="88" />
+    <img src="assets/orthovennplus-logo.svg" alt="OrthoVenn4" width="88" />
   </a>
 </p>
 
-<h1 align="center">OrthoVennPlus Docker 本地部署</h1>
+<h1 align="center">OrthoVenn4 Docker 本地部署</h1>
 
 <p align="center">
-  OrthoVennPlus 本地 Docker 部署包。
+  OrthoVenn4 本地 Docker 部署包。
 </p>
 
 <p align="center">
@@ -24,9 +24,9 @@
 
 
 
-# OrthoVennPlus 安装指南
+# OrthoVenn4 安装指南
 
-本指南适用于使用部署包安装 OrthoVennPlus 的常规场景。内容包括准备部署目录、配置环境变量、安装参考数据库、启动服务、创建管理员账号，以及可选的 SonicParanoid2 Pfam 数据库安装。
+本指南适用于使用部署包安装 OrthoVenn4 的常规场景。内容包括准备部署目录、配置环境变量、安装参考数据库、启动服务、创建管理员账号，以及可选的 SonicParanoid2 Pfam 数据库安装。
 
 ## 环境要求
 
@@ -134,7 +134,7 @@ chmod +x run.sh install_refdb.sh install_sonic_pfam_profiles.sh tools/install*.s
 
 #### 3. 安装参考数据库
 
-安装必要的参考数据库。安装脚本会根据区域选择默认下载源：global 安装优先使用 GitHub，中国大陆安装优先使用 Gitee；如果默认源不可用，都会回退到 OrthoVennPlus 官方源：
+安装必要的参考数据库。安装脚本会根据区域选择默认下载源：global 安装优先使用 GitHub，中国大陆安装优先使用 Gitee；如果默认源不可用，都会回退到 OrthoVenn4 官方源：
 
 ```bash
 ./install_refdb.sh

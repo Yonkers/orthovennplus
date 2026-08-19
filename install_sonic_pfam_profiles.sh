@@ -55,7 +55,7 @@ usage() {
   cat <<EOF
 Usage: ${SCRIPT_CMD} [status|download|install] [archive|--download]
 
-Run this script from the OrthovennPlus deployment directory.
+Run this script from the OrthoVenn4 deployment directory.
 
 Paths:
   Profile DB: ${PROFILE_DIR}

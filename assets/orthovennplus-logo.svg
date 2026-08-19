@@ -1,5 +1,5 @@
 <svg width="320" height="72" viewBox="0 0 320 72" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
-  <title id="title">OrthoVennPlus logo</title>
+  <title id="title">OrthoVenn4 logo</title>
   <desc id="desc">A refined scientific logo built from overlapping Venn sets for orthologous cluster analysis.</desc>
   <defs>
     <linearGradient id="ovp-card" x1="8" y1="8" x2="64" y2="64" gradientUnits="userSpaceOnUse">
@@ -38,8 +38,7 @@
   </g>
 
   <g aria-hidden="true">
-    <text x="78" y="34" fill="url(#ovp-word)" font-family="Avenir Next, Segoe UI, system-ui, sans-serif" font-size="24" font-weight="800" letter-spacing="0">OrthoVenn</text>
-    <text x="218" y="34" fill="#0F9FAD" font-family="Avenir Next, Segoe UI, system-ui, sans-serif" font-size="24" font-weight="800" letter-spacing="0">Plus</text>
-    <text x="80" y="52" fill="#52677C" font-family="Avenir Next, Segoe UI, system-ui, sans-serif" font-size="10.8" font-weight="700" letter-spacing="0.45">ORTHOLOGY / EVOLUTION / SYNTENY</text>
+    <text x="78" y="35" font-family="SF Pro Display, -apple-system, BlinkMacSystemFont, Segoe UI Variable Display, Segoe UI, sans-serif" font-size="25" font-weight="750" letter-spacing="-0.65" font-kerning="normal"><tspan fill="url(#ovp-word)">OrthoVenn</tspan><tspan fill="#0F9FAD" font-weight="850">4</tspan></text>
+    <text x="79" y="53" fill="#52677C" font-family="SF Pro Text, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="10.2" font-weight="650" letter-spacing="0.68">ORTHOLOGY / EVOLUTION / SYNTENY</text>
   </g>
 </svg>
